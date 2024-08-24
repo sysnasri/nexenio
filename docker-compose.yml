@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+#Router for routing traffic
+  router:
+        image: nginx:latest
+        ports:
+            - "80:80"
+        volumes:
+            - ./nginx/nginx-site.conf:/etc/nginx/conf.d/nginx-site.conf
+        container_name: router
+        restart: always 
+        depends_on:
+          - wordpress
+          - phpmyadmin
+          - maildev
+  db:
+    image: mysql:latest
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_pw
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_wordpress_pw
+    volumes:
+      - dbdata:/var/lib/mysql
+    secrets:
+      - mysql_root_pw
+      - mysql_wordpress_pw
+
+  wordpress:
+    image:  wordpress
+    container_name: wordpress
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/mysql_wordpress_pw
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_SMTP_HOST: maildev
+
+    volumes:
+      - wpdata:/var/www/html
+    depends_on:
+      - db
+    secrets:
+      - mysql_wordpress_pw
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    restart: always
+    ports:
+      - "9090:80"
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_wordpress_pw
+    depends_on:
+      - db
+    secrets:
+      - mysql_wordpress_pw
+
+  maildev:
+    image: maildev/maildev
+    container_name: maildev
+    restart: always
+    ports:
+      - "1080:80" # For web interface 
+      - "1025:25" # For SMTP server port
+    environment:
+      MAILDEV_SMTP_PORT: 1025
+
+volumes:
+  dbdata:
+  wpdata:
+
+secrets:
+  mysql_root_pw:
+    file: ./mysql_root_password.txt
+  mysql_wordpress_pw:
+    file: ./mysql_wordpress_password.txt
