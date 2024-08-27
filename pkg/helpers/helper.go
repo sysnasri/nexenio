@@ -47,48 +47,10 @@ func NewService(ctx context.Context) (*Service, error) {
 
 }
 
-// DockerClientInit initializes a Docker CLI client.
-
-// func (s *Service) DockerClientInit(ctx context.Context) (*command.DockerCli, error) {
-
-// 	// New docker Cli to intract with docker
-// 	dcli, err := command.NewDockerCli()
-// 	if failOnError("Could not create a new Docker cli", err) {
-// 		return nil, err
-// 	}
-
-// 	// Initialize docker cli
-// 	err = dcli.Initialize(&flags.ClientOptions{})
-// 	if failOnError("erro in dcli init", err) {
-// 		return nil, err
-// 	}
-
-// 	// it pings docker to see if it is alive
-// 	_, err = dcli.Client().Ping(ctx)
-// 	if failOnError("Could not ping docker!", err) {
-// 		return nil, err
-// 	}
-
-// 	return dcli, nil
-// }
-
-// Up brings up a Docker Compose project.
-
 func (s *Service) Up(ctx context.Context, cf []string) ([]api.Stack, error) {
 
 	return s.composeActions(ctx, cf, "up")
-	// ops, err := cli.NewProjectOptions(cf)
-	// failOnError("Error creating project options", err)
 
-	// pr, err := ops.LoadProject(ctx)
-	// s.ComposeProjectAddLabel(pr)
-
-	// failOnError("Error loading project", err)
-
-	// cs := compose.NewComposeService(dcli)
-	// err = cs.Up(ctx, pr, api.UpOptions{})
-	// failOnError("Failed to create the project", err)
-	// return nil
 }
 
 // Down brings down a Docker Compose project.
@@ -97,16 +59,6 @@ func (s *Service) Down(ctx context.Context, cf []string) ([]api.Stack, error) {
 
 	return s.composeActions(ctx, cf, "down")
 
-	// ops, err := cli.NewProjectOptions(cf)
-	// failOnError("Error creating project options", err)
-
-	// pr, err := ops.LoadProject(ctx)
-
-	// failOnError("Error loading project", err)
-
-	// cs := compose.NewComposeService(dcli)
-	// err = cs.Down(ctx, pr.Name, api.DownOptions{})
-	// failOnError("Failed to create the project", err)
 }
 
 // List lists all Docker Compose projects.
@@ -114,13 +66,6 @@ func (s *Service) Down(ctx context.Context, cf []string) ([]api.Stack, error) {
 func (s *Service) List(ctx context.Context, cf []string) ([]api.Stack, error) {
 	return s.composeActions(ctx, cf, "list")
 
-	// dsrv := compose.NewComposeService(dcli)
-	// p, err := dsrv.List(ctx, api.ListOptions{})
-	// if failOnError("error in listing compose", err) {
-	// 	return nil, err
-	// }
-
-	// return p, nil
 }
 
 // addLabel handles the common logic for bringing up or down a Docker Compose project.
@@ -143,6 +88,7 @@ func (s *Service) addLabel(pr *types.Project) {
 	}
 }
 
+// composeAaction runs a compose action such as up,down, list
 func (s *Service) composeActions(ctx context.Context, cf []string, act string) ([]api.Stack, error) {
 	ops, err := cli.NewProjectOptions(cf)
 	if failOnError("Error Creating Projects", err) {
