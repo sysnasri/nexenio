@@ -68,7 +68,7 @@ func (s *Service) List(ctx context.Context, cf []string) ([]api.Stack, error) {
 
 }
 
-// addLabel handles the common logic for bringing up or down a Docker Compose project.
+// addLabel handles add the labels for compose services
 
 func (s *Service) addLabel(pr *types.Project) {
 
