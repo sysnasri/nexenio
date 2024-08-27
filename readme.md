@@ -1,4 +1,4 @@
-# DevOps task for Nexenio 
+# DevOps task for Nexenio + Go SDK 
 Make sure that you have install docker and docker-compose on your local machine.
 Place your desired password in the following files: 
 
@@ -8,6 +8,9 @@ Place your desired password in the following files:
 
 ## How to use ? 
 You can run docker-compose up -d  to run all the container in docker-compose.yml file! 
+
+# GoLang added!
+I Just added a simple helper that run docker-compose with GO sdK! Find the helper in pkg/helpers/helper.go 
 
 
 ### Set a locally accessible domain!
