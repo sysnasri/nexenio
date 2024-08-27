@@ -4,7 +4,6 @@ import "github.com/sysnasri/nexenio/pkg/helpers"
 
 func main() {
 
-	helpers.ComposeProjectCreation("test", "./docker-compose.yml")
-	//Listcontainers()
+	helpers.ComposeProjectCreation("nasr", "./docker-compose.yml")
 
 }
