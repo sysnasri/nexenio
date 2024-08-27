@@ -1,9 +1,17 @@
 package main
 
-import "github.com/sysnasri/nexenio/pkg/helpers"
+import (
+	"context"
+
+	"github.com/sysnasri/nexenio/pkg/helpers"
+)
 
 func main() {
 
-	helpers.ComposeProjectCreation("nasr", "./docker-compose.yml")
+	cf := []string{"docker-compose.yml"}
+	ctx := context.Background()
+	s, _ := helpers.NewService(ctx)
+	_, _ = s.Down(ctx, cf)
+	_, _ = s.Up(ctx, cf)
 
 }

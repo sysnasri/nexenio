@@ -12,83 +12,125 @@ import (
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
-	"github.com/docker/docker/client"
 )
 
-func CheckErr(s string, err error) {
-
-	if err != nil {
-		log.Fatalf("%s : %v", s, err)
-	}
-
+type Service struct {
+	srv api.Service
+	cli *command.DockerCli
 }
 
-// DockerClientInit initialize docker client
-func DockerClientInit() (context.Context, *client.Client, *command.DockerCli, error) {
-
-	// Create a new context in background to connect to docker api
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	dc, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	CheckErr("Could not create docker client", err)
-	//defer dc.Close()
-
-	// New docker Cli to intract with docker
-	dcli, err := command.NewDockerCli()
-	CheckErr("Could not create a new Docker cli", err)
+// failOnError logs the given error with a message and returns a boolean indicating if an error occurred.
+func failOnError(message string, err error) bool {
 	if err != nil {
-		return nil, nil, nil, err
+		log.Printf("%s : %v", message, err)
+		return true
+
+	}
+	return false
+}
+
+func NewService(ctx context.Context) (*Service, error) {
+	dcli, err := command.NewDockerCli()
+	if failOnError("Error in creating Docker cli", err) {
+		return nil, err
 	}
 
 	err = dcli.Initialize(&flags.ClientOptions{})
-	CheckErr("erro in dcli init", err)
 
-	_, err = dcli.Client().Ping(ctx)
-	CheckErr("Could not ping docker!", err)
-	if err != nil {
-		return nil, nil, nil, err
+	if failOnError("Error in initializing docker client", err) {
+		return nil, err
 	}
-
-	return ctx, dc, dcli, nil
+	return &Service{
+		cli: dcli,
+		srv: compose.NewComposeService(dcli),
+	}, nil
 
 }
 
-// ListComposeProject lists docker stack projects
-func ListComposeProject() []api.Stack {
+// DockerClientInit initializes a Docker CLI client.
 
-	ctx, _, dcli, err := DockerClientInit()
-	CheckErr("Faild to initialize Docker client", err)
+// func (s *Service) DockerClientInit(ctx context.Context) (*command.DockerCli, error) {
 
-	// Creates docker Compose service to make a compose file up/down!
-	dcs := compose.NewComposeService(dcli)
+// 	// New docker Cli to intract with docker
+// 	dcli, err := command.NewDockerCli()
+// 	if failOnError("Could not create a new Docker cli", err) {
+// 		return nil, err
+// 	}
 
-	lo := api.ListOptions{
-		All: true,
-	}
+// 	// Initialize docker cli
+// 	err = dcli.Initialize(&flags.ClientOptions{})
+// 	if failOnError("erro in dcli init", err) {
+// 		return nil, err
+// 	}
 
-	// List of Compose projects
-	pl, err := dcs.List(ctx, lo)
-	CheckErr("Could not list projects", err)
+// 	// it pings docker to see if it is alive
+// 	_, err = dcli.Client().Ping(ctx)
+// 	if failOnError("Could not ping docker!", err) {
+// 		return nil, err
+// 	}
 
-	return pl
+// 	return dcli, nil
+// }
 
+// Up brings up a Docker Compose project.
+
+func (s *Service) Up(ctx context.Context, cf []string) ([]api.Stack, error) {
+
+	return s.composeActions(ctx, cf, "up")
+	// ops, err := cli.NewProjectOptions(cf)
+	// failOnError("Error creating project options", err)
+
+	// pr, err := ops.LoadProject(ctx)
+	// s.ComposeProjectAddLabel(pr)
+
+	// failOnError("Error loading project", err)
+
+	// cs := compose.NewComposeService(dcli)
+	// err = cs.Up(ctx, pr, api.UpOptions{})
+	// failOnError("Failed to create the project", err)
+	// return nil
 }
 
-func ComposeProjectCreation(p string, cf string) {
+// Down brings down a Docker Compose project.
 
-	ctx, cancel := context.WithCancel(context.Background())
+func (s *Service) Down(ctx context.Context, cf []string) ([]api.Stack, error) {
 
-	dcli, err := command.NewDockerCli()
-	CheckErr("Could not create a new Docker cli", err)
+	return s.composeActions(ctx, cf, "down")
 
-	err = dcli.Initialize(&flags.ClientOptions{})
-	CheckErr("Error initializing Docker CLI", err)
+	// ops, err := cli.NewProjectOptions(cf)
+	// failOnError("Error creating project options", err)
 
-	ops, err := cli.NewProjectOptions([]string{cf}, cli.WithWorkingDirectory("/Users/nasri/nexenio/"))
-	CheckErr("Error creating project options", err)
+	// pr, err := ops.LoadProject(ctx)
 
-	pr, err := ops.LoadProject(ctx)
+	// failOnError("Error loading project", err)
+
+	// cs := compose.NewComposeService(dcli)
+	// err = cs.Down(ctx, pr.Name, api.DownOptions{})
+	// failOnError("Failed to create the project", err)
+}
+
+// List lists all Docker Compose projects.
+
+func (s *Service) List(ctx context.Context, cf []string) ([]api.Stack, error) {
+	return s.composeActions(ctx, cf, "list")
+
+	// dsrv := compose.NewComposeService(dcli)
+	// p, err := dsrv.List(ctx, api.ListOptions{})
+	// if failOnError("error in listing compose", err) {
+	// 	return nil, err
+	// }
+
+	// return p, nil
+}
+
+// addLabel handles the common logic for bringing up or down a Docker Compose project.
+
+func (s *Service) addLabel(pr *types.Project) {
+
 	for i, s := range pr.Services {
+		if s.CustomLabels == nil {
+			s.CustomLabels = map[string]string{}
+		}
 		s.CustomLabels = map[string]string{
 			api.ProjectLabel:     pr.Name,
 			api.ServiceLabel:     s.Name,
@@ -99,65 +141,44 @@ func ComposeProjectCreation(p string, cf string) {
 		}
 		pr.Services[i] = s
 	}
-
-	CheckErr("Error loading project", err)
-
-	cs := compose.NewComposeService(dcli)
-	err = cs.Create(ctx, pr, api.CreateOptions{Services: pr.ServiceNames()})
-	CheckErr("Failed to create the project", err)
-
-	err = cs.Start(ctx, pr.Name, api.StartOptions{Project: pr, Services: pr.ServiceNames()})
-	CheckErr("Failed to start the project", err)
-	defer cancel()
 }
 
-func ComposeProjectCreation1(p string, cf string) {
+func (s *Service) composeActions(ctx context.Context, cf []string, act string) ([]api.Stack, error) {
+	ops, err := cli.NewProjectOptions(cf)
+	if failOnError("Error Creating Projects", err) {
+		return nil, err
+	}
 
-	// ctx, _, dcli, err := DockerClientInit()
-	// CheckErr("Faild to initialize Docker client %v", err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	_, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	CheckErr("Could not create docker client", err)
-
-	//dcs := compose.NewComposeService(dcli)
-
-	ops, err := cli.NewProjectOptions(
-		[]string{cf},
-		cli.WithWorkingDirectory("/Users/nasri/nexenio/"),
-	)
-	CheckErr("erro", err)
-
-	dcli, err := command.NewDockerCli()
-	CheckErr("erro", err)
-
-	err = dcli.Initialize(&flags.ClientOptions{})
-	CheckErr("error init docker", err)
 	pr, err := ops.LoadProject(ctx)
-	c, b := pr.ComposeFiles, pr.Configs
+	if failOnError("Error in Loading Projects", err) {
+		return nil, err
+	}
+	s.addLabel(pr)
 
-	fmt.Println(c, b)
-	CheckErr("error", err)
-	pryml, err := pr.MarshalYAML()
-	CheckErr("err", err)
-	fmt.Println(string(pryml))
+	var prl []api.Stack
+	switch act {
+	case "up":
+		err := s.srv.Up(ctx, pr, api.UpOptions{})
+		if failOnError("failed to execute up action on the project: ", err) {
+			return nil, err
 
-	cs := compose.NewComposeService(dcli)
-	err = cs.Create(ctx, &types.Project{
-		Name:     "nexenio",
-		Services: pr.Services,
-	}, api.CreateOptions{
-		Services: pr.ServiceNames(),
-	})
-	CheckErr("Failed to bring up the project", err)
-	err = cs.Start(ctx, "nexenio", api.StartOptions{
-		Project:  pr,
-		Services: pr.ServiceNames(),
-	})
-	CheckErr("Failed to bring up the project", err)
+		}
+	case "down":
+		err := s.srv.Down(ctx, pr.Name, api.DownOptions{})
+		if failOnError("failed to execute down action on the project: ", err) {
+			return nil, err
+
+		}
+	case "list":
+		prl, err = s.srv.List(ctx, api.ListOptions{})
+		if failOnError("failed to execute list action on the project: ", err) {
+			return nil, err
+
+		}
+	default:
+		return nil, fmt.Errorf("unsupported action: %s", act)
+	}
+
+	return prl, nil
+
 }
-
-//cs.Start(ctx, p, api.StartOptions{})
-
-//fmt.Println(string(pryml))
